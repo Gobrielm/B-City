@@ -1,0 +1,10 @@
+[gd_scene format=3 uid="uid://ch4crui1v6cvy"]
+
+[ext_resource type="PackedScene" uid="uid://cds2g8e3330kr" path="res://maps/terrain_map/terrain_map.tscn" id="1_vasa2"]
+[ext_resource type="PackedScene" uid="uid://bxdnu4rmud7sg" path="res://gui/player_camera.tscn" id="2_h7iqs"]
+
+[node name="Game" type="Node2D" unique_id=1355695968]
+
+[node name="TerrainMap" parent="." unique_id=906833294 instance=ExtResource("1_vasa2")]
+
+[node name="player_camera" parent="." unique_id=143694367 instance=ExtResource("2_h7iqs")]
