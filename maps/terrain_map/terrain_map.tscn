@@ -3,4 +3,5 @@
 [ext_resource type="Script" uid="uid://cagvuvy5ou2og" path="res://maps/terrain_map/terrain_map.gd" id="1_unq81"]
 
 [node name="TerrainMap" type="Node2D" unique_id=906833294]
+y_sort_enabled = true
 script = ExtResource("1_unq81")

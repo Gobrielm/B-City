@@ -1,23 +1,15 @@
-extends Node2D
+class_name TerrainMap extends RotatableMap
 
-const LAYERS: int = 10
+static var singleton_instance: TerrainMap = null
+
+static func get_instance() -> TerrainMap:
+	assert(singleton_instance != null, "Terrain Map has not been instanced yet.")
+	return singleton_instance
+
+static var e: float = 2.71828 
 var noise_seed: int = 100
 var noise = FastNoiseLite.new()
-var map_size = Vector2i(128, 128)
-
-var current_rotation: int = 0
-var rotation_90: Transform2D = Transform2D(1.57079632679, Vector2(0, 0))
-
-class TileInfo:
-	var atlas: Vector2i
-	var height: int
-	
-	func _init(p_atlas: Vector2i = Vector2i(0, 0), p_height: int = -1) -> void:
-		atlas = p_atlas
-		height = p_height
-
-var terrain_grid: Dictionary[Vector2i, TileInfo] = {}
-var terrain_layers: Array[TileMapLayer] = []
+var thread: Thread
 
 func _input(event: InputEvent) -> void:
 	var local_mouse_pos = get_local_mouse_position()
@@ -27,8 +19,8 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT and event.is_released():
 			replace_cell(tile_on_mouse, Vector2i(2, 0))
-	elif event.is_action("rotate_map") and event.is_released():
-		rotate_map_and_camera()
+	elif event.is_action("debug"):
+		visible = !visible
 	
 	player_camera.set_mouse_coords_label(tile_on_mouse)
 	
@@ -38,6 +30,37 @@ func _input(event: InputEvent) -> void:
 	player_camera.set_camera_coords_label(tile_on_camera)
 
 func _ready() -> void:
+	var tileset: TileSet = create_tile_set()
+	
+	for i in range(LAYERS):
+		var layer = TileMapLayer.new()
+		layer.tile_set = tileset
+		layer.z_index = 0
+		layers.append(layer)
+		layer.position = Vector2i(0, -32 * i)
+		layer.y_sort_origin = 32 * i
+		layer.y_sort_enabled = true
+		#layer.modulate = Color((float(i) / LAYERS) + 0.15, (float(i) / LAYERS) + 0.15, (float(i) / LAYERS + 0.15), 1)
+		add_child(layer)
+	
+	generate_map()
+	#set_cell(Vector2i(0, 0), Vector2i(0, 0), 0)
+	#set_cell(Vector2i(0, -1), Vector2i(0, 0), 1)
+	#set_cell(Vector2i(-1, -1), Vector2i(0, 0), 1)
+	#set_cell(Vector2i(0, -2), Vector2i(0, 0), 2)
+	#set_cell(Vector2i(0, -3), Vector2i(0, 0), 3)
+	assert(singleton_instance == null, "Terrain Map has been instanced twice.")
+	singleton_instance = self
+	
+	thread = Thread.new()
+	thread.start(create_cities.bind())
+
+func create_cities() -> void:
+	while(CityMap.singleton_instance == null):
+		OS.delay_msec(10)
+	CityMap.get_instance().generate_cities()
+
+func create_tile_set() -> TileSet:
 	var tileset: TileSet = TileSet.new()
 	tileset.tile_shape = TileSet.TILE_SHAPE_ISOMETRIC
 	tileset.tile_size = Vector2i(64, 32)
@@ -48,27 +71,14 @@ func _ready() -> void:
 	source.texture_region_size = Vector2i(64, 96)
 	
 	source.create_tile(Vector2i(0, 0))
-	source.create_tile(Vector2i(2, 0))
 	source.create_tile(Vector2i(1, 0))
+	source.create_tile(Vector2i(2, 0))
+	source.create_tile(Vector2i(3, 0))
+	source.create_tile(Vector2i(4, 0))
+	source.create_tile(Vector2i(0, 1))
+	source.create_tile(Vector2i(1, 1))
 	tileset.add_source(source)
-	
-	for i in range(0, LAYERS):
-		var layer = TileMapLayer.new()
-		layer.tile_set = tileset
-		layer.z_index = 0
-		terrain_layers.append(layer)
-		layer.position = Vector2i(0, -32 * i)
-		layer.y_sort_origin = 32 * i
-		layer.y_sort_enabled = true
-		#layer.modulate = Color((i / 10.0), (i / 10.0), (i / 10.0), 1)
-		add_child(layer)
-	
-	generate_map()
-	#set_cell(Vector2i(0, 0), Vector2i(0, 0), 0)
-	#set_cell(Vector2i(0, -1), Vector2i(0, 0), 1)
-	#set_cell(Vector2i(-1, -1), Vector2i(0, 0), 1)
-	#set_cell(Vector2i(0, -2), Vector2i(0, 0), 2)
-	#set_cell(Vector2i(0, -3), Vector2i(0, 0), 3)
+	return tileset
 
 func generate_map() -> void:
 	# Higher value, bigger mountains
@@ -79,137 +89,110 @@ func generate_map() -> void:
 	noise.frequency = 0.05
 	
 	# 2. Iterate through the grid
+	@warning_ignore("integer_division")
 	for x in range(-map_size.x / 2, map_size.x / 2):
+		@warning_ignore("integer_division")
 		for y in range(-map_size.y / 2, map_size.y / 2):
 			# get_noise_2d returns a value between 0 and 2.0
 			var noise_val = noise.get_noise_2d(x, y) + 1
+			var f_val = noise.get_noise_2d(y, x) + 1
 			
 			# redistribute values for height
 			var h_val = pow(noise_val, MOUNTAINNESS)
 			
 			# 3. Determine terrain based on thresholds
-			place_terrain(x, y, h_val)
+			place_terrain(x, y, h_val, f_val)
+	#generate_rivers()
 
-func set_cell(actual_tile: Vector2i, atlas: Vector2i, height: int) -> void:
-	terrain_grid[actual_tile] = TileInfo.new(atlas, height)
-	var local_tile = get_local_tile(actual_tile)
-	terrain_layers[height].set_cell(local_tile, 0, atlas)
-
-func get_cell(actual_tile: Vector2i) -> TileInfo:
-	if (!terrain_grid.has(actual_tile)): return null
-	return terrain_grid[actual_tile]
-
-func replace_cell(actual_tile: Vector2i, atlas: Vector2i) -> void:
-	assert(terrain_grid.has(actual_tile))
-	var height = terrain_grid[actual_tile].height
-	terrain_grid[actual_tile].atlas = atlas
-	var local_tile = get_local_tile(actual_tile)
-	terrain_layers[height].set_cell(local_tile, 0, atlas)
-
-func place_terrain(x: int, y: int, h_val: float) -> void:
+func place_terrain(x: int, y: int, h_val: float, f_val: float) -> void:
 	# TODO: MAKE SURE THAT HEIGHT IS abs(height - MAX(HEIGHT_OF_SURROUNDING_TILES)) <= 1
 	
-	var height: float = (h_val) * 5.0
+	var height: float = (h_val) * 2.0
+	var forested: bool = f_val > 1.0
+	var x_offset: int = 2 if forested else 0
+	
+	if (height <= 1):
+		set_cell(Vector2i(x, y), Vector2i(4, 0), 0)
+		return
 	
 	# Logic for mapping noise values to terrain
-	set_cell(Vector2i(x, y), Vector2i(0, 0), min(floor(height), LAYERS - 1))
-
-func get_cell_from_local(local_pos: Vector2) -> Vector2i:
+	height = min(round_to_step(height, 0.5), LAYERS - 1 + 0.5)
 	
-	var helper = func (local_position: Vector2, height: int) -> Variant:
-		var layer: TileMapLayer = terrain_layers[height]
-		for i: int in range(33):
-			var local_tile: Vector2i = layer.local_to_map(local_position - Vector2(0, i))
-			var actual_tile: Vector2i = get_real_tile(local_tile)
-			var tile_info: TileInfo = get_cell(actual_tile)
-			if (tile_info and tile_info.height == height): return actual_tile
-		return null
-		
-	
-	for height: int in range(terrain_layers.size() - 1, -1, -1):
-		var offset = Vector2(0, 32 * height)
-		
-		var actual_tile: Variant = helper.call(local_pos + offset, height)
-		if (actual_tile == null): continue
-
-		var tile_info: TileInfo = get_cell(actual_tile)
-		if (tile_info != null and tile_info.height == height):
-			return actual_tile
-	var local_tile_backup = terrain_layers[0].local_to_map(local_pos)
-	return get_real_tile(local_tile_backup)
-
-
-
-func get_local_from_cell(actual_tile: Vector2i) -> Vector2:
-	var tile_info: TileInfo = get_cell(actual_tile)
-	var local_tile: Vector2i = get_local_tile(actual_tile)
-	if (tile_info != null):
-		return terrain_layers[tile_info.height].map_to_local(local_tile) - Vector2(0, 32 * tile_info.height)
+	if (height > floor(height)):
+		set_cell(Vector2i(x, y), Vector2i(0 + x_offset, 0), min(floor(height), LAYERS - 1))
 	else:
-		return terrain_layers[0].map_to_local(local_tile)
+		set_cell(Vector2i(x, y), Vector2i(1 + x_offset, 0), min(floor(height), LAYERS - 1))
 
-func rotate_map() -> void:
-	for height in LAYERS:
-		rotate_layer(height)
-	
-	current_rotation = (current_rotation + 1) % 4
-	print(current_rotation)
+func round_to_step(value: float, step: float) -> float:
+	if step == 0.0:
+		return value
+	return round(value / step) * step
 
-func rotate_layer(height: int) -> void:
-	var layer: TileMapLayer = terrain_layers[height]
-	var used_cells: Array[Vector2i] = layer.get_used_cells()
+func generate_rivers() -> void:
+	var path: Array[Vector2i] = a_star(Vector2i(4, -10), Vector2i(30, 40))
+	for tile: Vector2i in path:
+		replace_cell(tile, Vector2i(4, 0))
+
+# --- Pathfinding ---
+
+func is_tile_traversable(actual_tile: Vector2i) -> bool:
+	var cell: Variant = get_cell(actual_tile)
+	if (cell == null): return false
+	var atlas: Vector2i = get_cell(actual_tile).atlas
+	return atlas != Vector2i(-1, -1)
+
+func create_route_from_tile_to_prev(start: Vector2i, destination: Vector2i, tile_to_prev: Dictionary) -> Array[Vector2i]:
+	var current: Vector2i = destination
+	var route: Array[Vector2i] = []
+	while current != start:
+		route.push_front(current)
+		current = tile_to_prev[current]
+	return route
+
+func a_star(start: Vector2i, destination: Vector2i) -> Array[Vector2i]:
 	
-	layer.clear()
+	# Can't reach dest
+	if (!is_tile_traversable(destination)):
+		return []
 	
-	for cell: Vector2i in used_cells:
-		var actual_pos: Vector2i = unrotate_tile(cell, current_rotation)
+	var current: Vector2i
+	var queue: priority_queue = priority_queue.new()
+	var tile_to_prev: Dictionary = {}
+	var visited: Dictionary = {}
+	var found: bool = false
+	queue.insert_element(start, 0)
+	visited[start] = 0
+	const MAX_TRIES: int = 100000
+	var tries: int = 0
+	
+	var get_h_cost = func(_pos: Vector2i) -> float:
+		return 0 # TODO: FIX HEURISTIC
+	
+	var get_tile_cost = func(s_tile: Vector2i, e_tile: Vector2i) -> float:
+		var h1 = get_cell(s_tile).height
+		var h2 = get_cell(e_tile).height
 		
-		var rotated_tile: Vector2i = rotate_tile(actual_pos, (current_rotation + 1) % 4)
-		var tile_info = get_cell(actual_pos)
-		if (tile_info == null): continue
-		var atlas: Vector2i = tile_info.atlas
-		layer.set_cell(rotated_tile, 0, atlas)
-
-func get_real_tile(local_tile: Vector2i) -> Vector2i:
-	return unrotate_tile(local_tile, current_rotation)
-
-func get_local_tile(real_tile: Vector2i) -> Vector2i:
-	return rotate_tile(real_tile, current_rotation)
-
-func unrotate_tile(pos: Vector2i, rot: int) -> Vector2i:
-	var rotated = pos
-	for i in range(0, rot):
-		rotated = Vector2i(
-			rotated.y,
-			-rotated.x
-		)
-	return rotated
-
-func rotate_tile(pos: Vector2i, rot: int) -> Vector2i:
-	var rotated = pos
-	for i in range(0, rot):
-		rotated = Vector2i(
-			-rotated.y,
-			rotated.x
-		)
-	return rotated
-
-func rotate_map_and_camera() -> void:
-	var pos: Vector2 = PlayerCamera.get_instance().get_screen_center_position()
-	var before_tile = get_cell_from_local(pos)
+		return pow(e, h2 - h1)
 	
-	rotate_map()
-	
-	var new_pos = get_local_from_cell(before_tile)
-	PlayerCamera.get_instance().set_screen_with_center_position(new_pos)
-
-#func rotate_map_and_camera() -> void:
-	#var pos: Vector2 = PlayerCamera.get_instance().position
-	#var local_tile_backup = terrain_layers[0].local_to_map(pos)
-	#var tile_before: Vector2i = get_real_tile(local_tile_backup)
-	#
-	#rotate_map()
-	#
-	#var new_pos: Vector2 = terrain_layers[0].map_to_local(get_local_tile(tile_before))
-	#PlayerCamera.get_instance().position = (new_pos)
-	
+	while !queue.is_empty():
+		tries += 1
+		if (tries >= MAX_TRIES):
+			print("TOO")
+			break
+		current = queue.pop_back()
+		if current == destination:
+			found = true
+			break
+		for tile: Vector2i in layers[0].get_surrounding_cells(current):
+			if (!is_tile_traversable(tile)): continue
+			
+			var base_cost: float = visited[current] + get_tile_cost.call(current, tile)
+			var h_cost: float = get_h_cost.call(tile)
+			if (!visited.has(tile) or visited[tile] > base_cost):
+				queue.insert_element(tile, base_cost + h_cost)
+				visited[tile] = base_cost
+				tile_to_prev[tile] = current
+	if found:
+		return create_route_from_tile_to_prev(start, destination, tile_to_prev)
+	else:
+		return []

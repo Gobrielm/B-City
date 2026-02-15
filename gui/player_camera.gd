@@ -2,6 +2,12 @@ class_name PlayerCamera extends Camera2D
 
 static var singleton_instance: PlayerCamera = null
 
+var current_rotation: int = 0
+const rotation_90: Transform2D = Transform2D(1.57079632679, Vector2(0, 0))
+
+var city_grid: Dictionary[Vector2i, TileInfo] = {}
+var city_layers: Array[TileMapLayer] = []
+
 static func get_instance() -> PlayerCamera:
 	assert(singleton_instance != null, "Camera has not been created yet")
 	return singleton_instance
