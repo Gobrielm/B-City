@@ -8,12 +8,12 @@ static func get_instance() -> TerrainMap:
 
 static var e: float = 2.71828 
 var noise_seed: int = 100
-var noise = FastNoiseLite.new()
+var noise: FastNoiseLite = FastNoiseLite.new()
 var thread: Thread
 
 func _input(event: InputEvent) -> void:
-	var local_mouse_pos = get_local_mouse_position()
-	var tile_on_mouse = get_cell_from_local(local_mouse_pos)
+	var local_mouse_pos: Vector2 = get_local_mouse_position()
+	var tile_on_mouse: Vector2i = get_cell_from_local(local_mouse_pos)
 	var player_camera: PlayerCamera = PlayerCamera.get_instance()
 	
 	if event is InputEventMouseButton:
@@ -25,15 +25,15 @@ func _input(event: InputEvent) -> void:
 	player_camera.set_mouse_coords_label(tile_on_mouse)
 	
 	var local_camera_pos: Vector2 = player_camera.get_screen_center_position()
-	var tile_on_camera = get_cell_from_local(local_camera_pos)
+	var tile_on_camera: Vector2i = get_cell_from_local(local_camera_pos)
 	
 	player_camera.set_camera_coords_label(tile_on_camera)
 
 func _ready() -> void:
 	var tileset: TileSet = create_tile_set()
 	
-	for i in range(LAYERS):
-		var layer = TileMapLayer.new()
+	for i: int in range(LAYERS):
+		var layer: TileMapLayer = TileMapLayer.new()
 		layer.tile_set = tileset
 		layer.z_index = 0
 		layers.append(layer)
@@ -66,7 +66,7 @@ func create_tile_set() -> TileSet:
 	tileset.tile_size = Vector2i(64, 32)
 	tileset.tile_layout = TileSet.TILE_LAYOUT_DIAMOND_DOWN
 	
-	var source = TileSetAtlasSource.new()
+	var source: TileSetAtlasSource = TileSetAtlasSource.new()
 	source.texture = load("res://assets/isometric.png")
 	source.texture_region_size = Vector2i(64, 96)
 	
@@ -75,14 +75,13 @@ func create_tile_set() -> TileSet:
 	source.create_tile(Vector2i(2, 0))
 	source.create_tile(Vector2i(3, 0))
 	source.create_tile(Vector2i(4, 0))
-	source.create_tile(Vector2i(0, 1))
-	source.create_tile(Vector2i(1, 1))
+	source.create_tile(Vector2i(5, 0))
 	tileset.add_source(source)
 	return tileset
 
 func generate_map() -> void:
 	# Higher value, bigger mountains
-	const MOUNTAINNESS = 1.5
+	const MOUNTAINNESS: float = 1.5
 	# 1. Initialize Noise
 	noise.seed = noise_seed if noise_seed != 0 else randi()
 	noise.noise_type = FastNoiseLite.TYPE_PERLIN
@@ -90,43 +89,35 @@ func generate_map() -> void:
 	
 	# 2. Iterate through the grid
 	@warning_ignore("integer_division")
-	for x in range(-map_size.x / 2, map_size.x / 2):
+	for x: int in range(-map_size.x / 2, map_size.x / 2):
 		@warning_ignore("integer_division")
-		for y in range(-map_size.y / 2, map_size.y / 2):
+		for y: int in range(-map_size.y / 2, map_size.y / 2):
 			# get_noise_2d returns a value between 0 and 2.0
-			var noise_val = noise.get_noise_2d(x, y) + 1
-			var f_val = noise.get_noise_2d(y, x) + 1
+			var noise_val: float = noise.get_noise_2d(x, y) + 1
+			var f_val: float = noise.get_noise_2d(y, x) + 1
 			
 			# redistribute values for height
-			var h_val = pow(noise_val, MOUNTAINNESS)
+			var h_val: float = pow(noise_val, MOUNTAINNESS)
 			
 			# 3. Determine terrain based on thresholds
 			place_terrain(x, y, h_val, f_val)
 	#generate_rivers()
 
 func place_terrain(x: int, y: int, h_val: float, f_val: float) -> void:
-	# TODO: MAKE SURE THAT HEIGHT IS abs(height - MAX(HEIGHT_OF_SURROUNDING_TILES)) <= 1
 	
 	var height: float = (h_val) * 2.0
 	var forested: bool = f_val > 1.0
 	var x_offset: int = 2 if forested else 0
 	
 	if (height <= 1):
-		set_cell(Vector2i(x, y), Vector2i(4, 0), 0)
+		
+		set_cell(Vector2i(x, y), TileInfo.new(Vector2i(4, 0), 0))
 		return
 	
-	# Logic for mapping noise values to terrain
-	height = min(round_to_step(height, 0.5), LAYERS - 1 + 0.5)
-	
-	if (height > floor(height)):
-		set_cell(Vector2i(x, y), Vector2i(0 + x_offset, 0), min(floor(height), LAYERS - 1))
+	if (round(height) > floor(height)):
+		set_cell(Vector2i(x, y), TileInfo.new(Vector2i(0 + x_offset, 0), min(floor(height), LAYERS - 1) as int))
 	else:
-		set_cell(Vector2i(x, y), Vector2i(1 + x_offset, 0), min(floor(height), LAYERS - 1))
-
-func round_to_step(value: float, step: float) -> float:
-	if step == 0.0:
-		return value
-	return round(value / step) * step
+		set_cell(Vector2i(x, y),  TileInfo.new(Vector2i(1 + x_offset, 0), min(floor(height), LAYERS - 1) as int))
 
 func generate_rivers() -> void:
 	var path: Array[Vector2i] = a_star(Vector2i(4, -10), Vector2i(30, 40))
@@ -140,14 +131,6 @@ func is_tile_traversable(actual_tile: Vector2i) -> bool:
 	if (cell == null): return false
 	var atlas: Vector2i = get_cell(actual_tile).atlas
 	return atlas != Vector2i(-1, -1)
-
-func create_route_from_tile_to_prev(start: Vector2i, destination: Vector2i, tile_to_prev: Dictionary) -> Array[Vector2i]:
-	var current: Vector2i = destination
-	var route: Array[Vector2i] = []
-	while current != start:
-		route.push_front(current)
-		current = tile_to_prev[current]
-	return route
 
 func a_star(start: Vector2i, destination: Vector2i) -> Array[Vector2i]:
 	
@@ -165,12 +148,12 @@ func a_star(start: Vector2i, destination: Vector2i) -> Array[Vector2i]:
 	const MAX_TRIES: int = 100000
 	var tries: int = 0
 	
-	var get_h_cost = func(_pos: Vector2i) -> float:
+	var get_h_cost: Callable = func(_pos: Vector2i) -> float:
 		return 0 # TODO: FIX HEURISTIC
 	
-	var get_tile_cost = func(s_tile: Vector2i, e_tile: Vector2i) -> float:
-		var h1 = get_cell(s_tile).height
-		var h2 = get_cell(e_tile).height
+	var get_tile_cost: Callable = func(s_tile: Vector2i, e_tile: Vector2i) -> float:
+		var h1: int = get_cell(s_tile).height
+		var h2: int = get_cell(e_tile).height
 		
 		return pow(e, h2 - h1)
 	

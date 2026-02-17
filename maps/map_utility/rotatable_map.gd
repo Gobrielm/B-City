@@ -2,7 +2,7 @@ class_name RotatableMap extends Node2D
 
 var current_rotation: int = 0
 const LAYERS: int = 10
-const map_size = Vector2i(128, 128)
+const map_size: Vector2i = Vector2i(128, 128)
 
 var grid: Dictionary[Vector2i, TileInfo] = {}
 var layers: Array[TileMapLayer] = []
@@ -18,10 +18,10 @@ func _ready() -> void:
 
 # --- Cell Utility Functions ---
 
-func set_cell(actual_tile: Vector2i, atlas: Vector2i, height: float) -> void:
-	grid[actual_tile] = TileInfo.new(atlas, height)
-	var local_tile = get_local_tile(actual_tile)
-	layers[floor(height)].set_cell(local_tile, 0, atlas)
+func set_cell(actual_tile: Vector2i, tile_info: TileInfo) -> void:
+	grid[actual_tile] = tile_info
+	var local_tile: Vector2i = get_local_tile(actual_tile)
+	layers[tile_info.height].set_cell(local_tile, 0, tile_info.atlas)
 
 func get_cell(actual_tile: Vector2i) -> TileInfo:
 	if (!grid.has(actual_tile)): return null
@@ -29,14 +29,62 @@ func get_cell(actual_tile: Vector2i) -> TileInfo:
 
 func replace_cell(actual_tile: Vector2i, atlas: Vector2i) -> void:
 	assert(grid.has(actual_tile))
-	var height = grid[actual_tile].height
+	var height: int = grid[actual_tile].height
 	grid[actual_tile].atlas = atlas
-	var local_tile = get_local_tile(actual_tile)
-	layers[floor(height)].set_cell(local_tile, 0, atlas)
+	var local_tile: Vector2i = get_local_tile(actual_tile)
+	layers[height].set_cell(local_tile, 0, atlas)
+
+func erase_cell(actual_tile: Vector2i) -> void:
+	assert(grid.has(actual_tile))
+	var height: int = grid[actual_tile].height
+	grid.erase(actual_tile)
+	var local_tile: Vector2i = get_local_tile(actual_tile)
+	layers[height].erase_cell(local_tile)
+
+func get_used_cells() -> Array[Vector2i]:
+	var toReturn: Array[Vector2i] = []
+	for layer: TileMapLayer in layers:
+		for cell: Vector2i in layer.get_used_cells():
+			toReturn.push_back(get_real_tile(cell))
+	return toReturn
+
+# --- Pathfinding ---
+func bfs(start: Vector2i, destination: Vector2i) -> Array[Vector2i]:
+	var current: Vector2i
+	var queue: Array = [start]
+	var tile_to_prev: Dictionary = {}
+	var visited: Dictionary[Vector2i, int] = {}
+	var found: bool = false
+	visited[start] = 0
+	
+	while !queue.is_empty():
+		current = queue.pop_front()
+		if current == destination:
+			found = true
+			break
+		for tile: Vector2i in layers[0].get_surrounding_cells(current):
+			if (!visited.has(tile)):
+				queue.push_back(tile)
+				visited[tile] = 0
+				tile_to_prev[tile] = current
+	if found:
+		return create_route_from_tile_to_prev(start, destination, tile_to_prev)
+	else:
+		return []
+
+
+func create_route_from_tile_to_prev(start: Vector2i, destination: Vector2i, tile_to_prev: Dictionary) -> Array[Vector2i]:
+	var current: Vector2i = destination
+	var route: Array[Vector2i] = []
+	while current != start:
+		route.push_front(current)
+		current = tile_to_prev[current]
+	return route
+
+# --- Rotations and Local/Actual Conversions ---
 
 func get_cell_from_local(local_pos: Vector2) -> Vector2i:
-	
-	var helper = func (local_position: Vector2, height: int) -> Variant:
+	var helper: Callable = func (local_position: Vector2, height: int) -> Variant:
 		var layer: TileMapLayer = layers[height]
 		for i: int in range(33):
 			var local_tile: Vector2i = layer.local_to_map(local_position - Vector2(0, i))
@@ -46,15 +94,16 @@ func get_cell_from_local(local_pos: Vector2) -> Vector2i:
 		return null
 	
 	for height: int in range(layers.size() - 1, -1, -1):
-		var offset = Vector2(0, 32 * height)
+		var offset: Vector2 = Vector2(0, 32 * height)
 		
 		var actual_tile: Variant = helper.call(local_pos + offset, height)
 		if (actual_tile == null): continue
-
-		var tile_info: TileInfo = get_cell(actual_tile)
-		if (tile_info != null and floor(tile_info.height) == height):
+		var tile_pos: Vector2i = actual_tile
+		
+		var tile_info: TileInfo = get_cell(tile_pos)
+		if (tile_info != null and tile_info.height == height):
 			return actual_tile
-	var local_tile_backup = layers[0].local_to_map(local_pos)
+	var local_tile_backup: Vector2i = layers[0].local_to_map(local_pos)
 	return get_real_tile(local_tile_backup)
 
 func get_local_from_cell(actual_tile: Vector2i) -> Vector2:
@@ -64,8 +113,6 @@ func get_local_from_cell(actual_tile: Vector2i) -> Vector2:
 		return layers[tile_info.height].map_to_local(local_tile) - Vector2(0, 32 * tile_info.height)
 	else:
 		return layers[0].map_to_local(local_tile)
-
-# --- Rotations and Local/Actual Conversions ---
  
 func rotate_map(rotate_left: bool) -> void:
 	for height: int in LAYERS:
@@ -84,7 +131,7 @@ func rotate_layer(height: int, rotate_left: bool) -> void:
 		var actual_pos: Vector2i = unrotate_tile(cell, current_rotation)
 		
 		var rotated_tile: Vector2i = rotate_tile(actual_pos, get_next_rotation(rotate_left))
-		var tile_info = get_cell(actual_pos)
+		var tile_info: TileInfo = get_cell(actual_pos)
 		if (tile_info == null): continue
 		var atlas: Vector2i = tile_info.atlas
 		layer.set_cell(rotated_tile, 0, atlas)
@@ -104,8 +151,8 @@ func get_local_tile(real_tile: Vector2i) -> Vector2i:
 	return rotate_tile(real_tile, current_rotation)
 
 func unrotate_tile(pos: Vector2i, rot: int) -> Vector2i:
-	var rotated = pos
-	for i in range(0, rot):
+	var rotated: Vector2i = pos
+	for i: int in range(0, rot):
 		rotated = Vector2i(
 			rotated.y,
 			-rotated.x
@@ -113,8 +160,8 @@ func unrotate_tile(pos: Vector2i, rot: int) -> Vector2i:
 	return rotated
 
 func rotate_tile(pos: Vector2i, rot: int) -> Vector2i:
-	var rotated = pos
-	for i in range(0, rot):
+	var rotated: Vector2i = pos
+	for i: int in range(0, rot):
 		rotated = Vector2i(
 			-rotated.y,
 			rotated.x
@@ -123,9 +170,9 @@ func rotate_tile(pos: Vector2i, rot: int) -> Vector2i:
 
 func rotate_map_and_camera(rotate_left: bool) -> void:
 	var pos: Vector2 = PlayerCamera.get_instance().get_screen_center_position()
-	var before_tile = get_cell_from_local(pos)
+	var before_tile: Vector2i = get_cell_from_local(pos)
 	
 	rotate_map(rotate_left)
 	
-	var new_pos = get_local_from_cell(before_tile)
+	var new_pos: Vector2i = get_local_from_cell(before_tile)
 	PlayerCamera.get_instance().set_screen_with_center_position(new_pos)

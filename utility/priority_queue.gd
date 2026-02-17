@@ -10,17 +10,20 @@ func _init() -> void:
 func pop_top() -> Variant: ##Use Pop front for biggest weight
 	if get_size() == 0:
 		return null
-	return (backing_array.pop_front() as weighted_value).val
+	var w_val: weighted_value = backing_array.pop_front()
+	return (w_val).val
 
 func pop_top_weighted_val() -> weighted_value: ##Use Pop front for biggest weight
 	if get_size() == 0:
 		return null
-	return (backing_array.pop_front() as weighted_value)
+	var w_val: weighted_value = backing_array.pop_front()
+	return w_val
 
 func pop_back() -> Variant: ##Use Pop back for smallest weight
 	if get_size() == 0:
 		return null
-	return (backing_array.pop_back() as weighted_value).val
+	var w_val: weighted_value = backing_array.pop_back()
+	return w_val.val
 
 func get_size() -> int:
 	return backing_array.size()

@@ -39,7 +39,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		position -= event.relative * 1.0/zoom
 
 func zoom_camera(delta: float) -> void:
-	var new_zoom = clamp(zoom.x + delta, min_zoom, max_zoom)
+	var new_zoom: float = clamp(zoom.x + delta, min_zoom, max_zoom)
 	zoom = Vector2(new_zoom, new_zoom)
 
 func rotate_camera_by_90() -> void:
@@ -49,9 +49,7 @@ func rotate_camera_by_90() -> void:
 	)
 
 func set_screen_with_center_position(pos: Vector2) -> void:
-	var actual = pos
-	 #+ (get_viewport_rect().size / 2.0)
-	position = actual
+	position = pos
 
 func set_mouse_coords_label(tile: Vector2i) -> void:
 	$CanvasLayer/MosueCoordsLabel.text = "Mouse Coords: " + str(tile)
