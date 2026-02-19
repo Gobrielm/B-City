@@ -1,0 +1,29 @@
+[gd_scene format=3 uid="uid://bxdnu4rmud7sg"]
+
+[ext_resource type="Script" uid="uid://bqomrl0t64pkv" path="res://gui/player_camera.gd" id="1_vrnrs"]
+
+[node name="player_camera" type="Camera2D" unique_id=143694367]
+script = ExtResource("1_vrnrs")
+
+[node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=2088751896]
+
+[node name="MosueCoordsLabel" type="Label" parent="CanvasLayer" unique_id=416693205]
+offset_left = 388.0
+offset_top = 268.0
+offset_right = 507.0
+offset_bottom = 291.0
+text = "Mouse Coords: "
+
+[node name="CameraCoordsLabel" type="Label" parent="CanvasLayer" unique_id=1329911752]
+offset_left = 385.0
+offset_top = 221.0
+offset_right = 504.0
+offset_bottom = 244.0
+text = "Camera Coords: "
+
+[node name="ColorRect" type="ColorRect" parent="CanvasLayer" unique_id=9021827]
+offset_left = -2.0
+offset_top = -2.0
+offset_right = 2.0
+offset_bottom = 2.0
+color = Color(1, 1, 1, 0.49019608)
