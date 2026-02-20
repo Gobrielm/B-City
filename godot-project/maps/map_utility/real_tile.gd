@@ -10,3 +10,12 @@ func add_vector2i(to_add: Vector2i) -> RealTile:
 
 func distance_to(real_tile: RealTile) -> float:
 	return tile.distance_to(real_tile.tile)
+
+func hash() -> Vector2i:
+	return tile
+
+func is_equal(other: RealTile) -> bool:
+	return tile == other.tile
+
+func _to_string() -> String:
+	return str(tile)

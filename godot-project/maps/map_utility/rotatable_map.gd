@@ -4,7 +4,7 @@ var current_rotation: int = 0
 const LAYERS: int = 10
 const map_size: Vector2i = Vector2i(128, 128)
 
-var grid: Dictionary[RealTile, TileInfo] = {}
+var grid: Dictionary[Vector2i, TileInfo] = {}
 var layers: Array[TileMapLayer] = []
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -19,25 +19,25 @@ func _ready() -> void:
 # --- Cell Utility Functions ---
 
 func set_cell(actual_tile: RealTile, tile_info: TileInfo) -> void:
-	grid[actual_tile] = tile_info
+	grid[actual_tile.hash()] = tile_info
 	var local_tile: LocalTile = get_local_tile(actual_tile)
 	layers[tile_info.height].set_cell(local_tile.tile, 0, tile_info.atlas)
 
 func get_cell(actual_tile: RealTile) -> TileInfo:
-	if (!grid.has(actual_tile)): return null
-	return grid[actual_tile]
+	if (!grid.has(actual_tile.hash())): return null
+	return grid[actual_tile.hash()]
 
 func replace_cell(actual_tile: RealTile, atlas: Vector2i) -> void:
 	assert(grid.has(actual_tile))
-	var height: int = grid[actual_tile].height
-	grid[actual_tile].atlas = atlas
+	var height: int = grid[actual_tile.hash()].height
+	grid[actual_tile.hash()].atlas = atlas
 	var local_tile: LocalTile = get_local_tile(actual_tile)
 	layers[height].set_cell(local_tile.tile, 0, atlas)
 
 func erase_cell(actual_tile: RealTile) -> void:
-	assert(grid.has(actual_tile))
-	var height: int = grid[actual_tile].height
-	grid.erase(actual_tile)
+	assert(grid.has(actual_tile.hash()))
+	var height: int = grid[actual_tile.hash()].height
+	grid.erase(actual_tile.hash())
 	var local_tile: LocalTile = get_local_tile(actual_tile)
 	layers[height].erase_cell(local_tile.tile)
 

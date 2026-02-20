@@ -1,0 +1,4 @@
+C:/Users/gabri/Documents/b-city/build/CMakeFiles/generate_bindings.dir
+C:/Users/gabri/Documents/b-city/build/CMakeFiles/godot-cpp.dir
+C:/Users/gabri/Documents/b-city/build/CMakeFiles/edit_cache.dir
+C:/Users/gabri/Documents/b-city/build/CMakeFiles/rebuild_cache.dir

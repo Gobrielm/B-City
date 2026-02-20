@@ -1,13 +1,6 @@
 [gd_scene format=3 uid="uid://bumducc13p5oy"]
 
 [ext_resource type="Script" uid="uid://bxp4o0ku42p5t" path="res://test/test.gd" id="1_37kl0"]
-[ext_resource type="PackedScene" uid="uid://b2ye582n4q7hl" path="res://machine_learning/LinearTestClass.tscn" id="2_8uh7m"]
 
 [node name="Test" type="Node2D" unique_id=1707640233]
 script = ExtResource("1_37kl0")
-
-[node name="LinearTestClass" parent="." unique_id=21446542 instance=ExtResource("2_8uh7m")]
-test_int = 5
-test_float = 5.2
-test_bool = true
-test_vector = Vector3(1, 2, 3)
