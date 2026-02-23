@@ -141,11 +141,11 @@ func a_star(start: RealTile, destination: RealTile) -> Array[RealTile]:
 	
 	var current: RealTile
 	var queue: priority_queue = priority_queue.new()
-	var tile_to_prev: Dictionary[RealTile, RealTile] = {}
-	var visited: Dictionary[RealTile, float] = {}
+	var tile_to_prev: Dictionary[Vector2i, RealTile] = {}
+	var visited: Dictionary[Vector2i, float] = {}
 	var found: bool = false
 	queue.insert_element(start, 0)
-	visited[start] = 0
+	visited[start.hash()] = 0
 	const MAX_TRIES: int = 100000
 	var tries: int = 0
 	
@@ -164,19 +164,19 @@ func a_star(start: RealTile, destination: RealTile) -> Array[RealTile]:
 			print("TOO")
 			break
 		current = queue.pop_back()
-		if current == destination:
+		if current.hash() == destination.hash():
 			found = true
 			break
 		for real: Vector2i in layers[0].get_surrounding_cells(current.tile):
 			var real_tile: RealTile = RealTile.new(real)
 			if (!is_tile_traversable(real_tile)): continue
 			
-			var base_cost: float = visited[current] + get_tile_cost.call(current, real_tile)
+			var base_cost: float = visited[current.hash()] + get_tile_cost.call(current, real_tile)
 			var h_cost: float = get_h_cost.call(real_tile)
-			if (!visited.has(real_tile) or visited[real_tile] > base_cost):
+			if (!visited.has(real_tile.hash()) or visited[real_tile.hash()] > base_cost):
 				queue.insert_element(real_tile, base_cost + h_cost)
-				visited[real_tile] = base_cost
-				tile_to_prev[real_tile] = current
+				visited[real_tile.hash()] = base_cost
+				tile_to_prev[real_tile.hash()] = current
 	if found:
 		return create_route_from_tile_to_prev(start, destination, tile_to_prev)
 	else:

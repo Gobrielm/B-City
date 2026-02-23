@@ -70,34 +70,34 @@ func get_surrounding_cells(tile: Vector2i) -> Array[Vector2i]:
 func bfs(start: RealTile, destination: RealTile, is_traversable: Callable = func (_tile: RealTile) -> bool: return true) -> Array[RealTile]:
 	var current: RealTile
 	var queue: Array[RealTile] = [start]
-	var tile_to_prev: Dictionary[RealTile, RealTile] = {}
-	var visited: Dictionary[RealTile, int] = {}
+	var tile_to_prev: Dictionary[Vector2i, RealTile] = {}
+	var visited: Dictionary[Vector2i, int] = {}
 	var found: bool = false
-	visited[start] = 0
+	visited[start.hash()] = 0
 	
 	while !queue.is_empty():
 		current = queue.pop_front()
-		if current == destination:
+		if current.hash() == destination.hash():
 			found = true
 			break
 		for real: Vector2i in layers[0].get_surrounding_cells(current.tile):
 			var real_tile: RealTile = RealTile.new(real)
-			if (!visited.has(real_tile) and is_traversable.call(real_tile)):
+			if (!visited.has(real_tile.hash()) and is_traversable.call(real_tile)):
 				queue.push_back(real_tile)
-				visited[real_tile] = 0
-				tile_to_prev[real_tile] = current
+				visited[real_tile.hash()] = 0
+				tile_to_prev[real_tile.hash()] = current
 	if found:
 		return create_route_from_tile_to_prev(start, destination, tile_to_prev)
 	else:
 		return []
 
 
-func create_route_from_tile_to_prev(start: RealTile, destination: RealTile, tile_to_prev: Dictionary[RealTile, RealTile]) -> Array[RealTile]:
+func create_route_from_tile_to_prev(start: RealTile, destination: RealTile, tile_to_prev: Dictionary[Vector2i, RealTile]) -> Array[RealTile]:
 	var current: RealTile = destination
 	var route: Array[RealTile] = []
-	while current != start:
+	while current.hash() != start.hash():
 		route.push_front(current)
-		current = tile_to_prev[current]
+		current = tile_to_prev[current.hash()]
 	return route
 
 # --- Rotations and Local/Actual Conversions ---
@@ -127,8 +127,9 @@ func get_cell_from_local(local_pos: Vector2) -> RealTile:
 func get_local_from_cell(actual_tile: RealTile) -> Vector2:
 	var tile_info: TileInfo = get_cell(actual_tile)
 	var local_tile: LocalTile = get_local_tile(actual_tile)
+	var y_offset: int = 16 if tile_info.is_half_tile() else 0
 	if (tile_info != null):
-		return layers[tile_info.height].map_to_local(local_tile.tile) - Vector2(0, 32 * tile_info.height)
+		return layers[tile_info.height].map_to_local(local_tile.tile) - Vector2(0, 32 * tile_info.height) + Vector2(0, y_offset)
 	else:
 		return layers[0].map_to_local(local_tile.tile)
  

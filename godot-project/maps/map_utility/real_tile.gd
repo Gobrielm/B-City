@@ -14,8 +14,5 @@ func distance_to(real_tile: RealTile) -> float:
 func hash() -> Vector2i:
 	return tile
 
-func is_equal(other: RealTile) -> bool:
-	return tile == other.tile
-
 func _to_string() -> String:
 	return str(tile)

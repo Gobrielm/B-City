@@ -1,7 +1,0 @@
-[gd_scene format=3 uid="uid://dgt1jhklgffhj"]
-
-[ext_resource type="Script" uid="uid://d2lovunsoqfab" path="res://maps/city_map/city_map.gd" id="1_80hia"]
-
-[node name="CityMap" type="Node2D" unique_id=168603902]
-y_sort_enabled = true
-script = ExtResource("1_80hia")

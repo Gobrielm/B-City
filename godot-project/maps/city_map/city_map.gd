@@ -1,6 +1,7 @@
 class_name CityMap extends RotatableMap
 
-var people: Array[int] = []
+var people: Dictionary[int, Person] = {}
+var people_to_remove: Array[int] = []
 
 static var singleton_instance: CityMap = null
 
@@ -9,7 +10,8 @@ static func get_instance() -> CityMap:
 	return singleton_instance
 
 func _process(_delta: float) -> void:
-	pass
+	clean_people()
+	spawn_person()
 
 func _input(event: InputEvent) -> void:
 	if (event.is_action_released("debug")):
@@ -33,6 +35,23 @@ func _ready() -> void:
 	
 	singleton_instance = self
 
+func rotate_map(rotate_left: bool) -> void:
+	super.rotate_map(rotate_left)
+	
+	for person: Person in people.values():
+		var current_pos: RealTile = person.get_current_target()
+		if (current_pos == null): continue
+		person.position = get_local_from_cell(current_pos)
+
+func append_person_to_remove(person_id: int) -> void:
+	people_to_remove.append(person_id)
+
+func clean_people() -> void:
+	for person_id: int in people_to_remove:
+		people[person_id].queue_free()
+		people.erase(person_id)
+	people_to_remove.clear()
+
 func create_tile_set() -> TileSet:
 	var tileset: TileSet = TileSet.new()
 	tileset.tile_shape = TileSet.TILE_SHAPE_ISOMETRIC
@@ -52,6 +71,8 @@ func create_tile_set() -> TileSet:
 	source.create_tile(Vector2i(1, 1))
 	tileset.add_source(source)
 	return tileset
+
+# --- City Generation ---
 
 func generate_cities() -> void:
 	while TerrainMap.singleton_instance == null:
@@ -77,6 +98,7 @@ func generate_cities() -> void:
 		var rand_tile: RealTile = RealTile.new(Vector2i(rand_x, rand_y))
 		if (check_validity.call(rand_tile)):
 			locations.push_front(rand_tile)
+			break
 		
 	for location: RealTile in locations:
 		generate_city(location)
@@ -154,6 +176,8 @@ func get_perpendicular_dirs(dir: Vector2i) -> Array[Vector2i]:
 	else:
 		return [Vector2i(0, 1), Vector2i(0, -1)]
 
+# --- People ---
+
 func spawn_person() -> void:
 	var cells: Array[RealTile] = get_used_cells_by_multiple_ids([Vector2i(0, 1), Vector2i(1, 1)])
 	var cell: RealTile = cells.pick_random()
@@ -162,37 +186,40 @@ func spawn_person() -> void:
 	person.position = get_local_from_cell(cell)
 	add_child(person)
 	person.set_route(create_route_for_person(cell))
-	person.z_index += 1
-	#person.apply_scale(Vector2(2, 2))
-	person.apply_scale(Vector2(20, 20))
-	people.append(person.get_instance_id())
-	move_camera_to_tile(cell)
+	person.z_index = 0
+	person.apply_scale(Vector2(2, 2))
+	#person.apply_scale(Vector2(20, 20))
+	people[person.get_instance_id()] = person
+	#person.set_random_offset(Vector2(randi_range(0, 16), randi_range(0, 16)))
+	#move_camera_to_tile(cell)
 	
 func get_tiles_connected_by_road(real_start: RealTile) -> Array[RealTile]:
 	var queue: Array[RealTile] = [real_start]
-	var visited: Dictionary[RealTile, bool] = {}
+	var visited: Dictionary[Vector2i, bool] = {}
 	var connected: Array[RealTile] = []
 
 	if not is_road(real_start):
 		return []
 
-	visited[real_start] = true
+	visited[real_start.hash()] = true
 
 	while not queue.is_empty():
 		var current: RealTile = queue.pop_front()
 
 		for t: Vector2i in get_surrounding_cells(current.tile):
 			var tile: RealTile = RealTile.new(t)
-			if visited.has(tile) or not is_road(tile):
+			if visited.has(tile.hash()) or not is_road(tile):
 				continue
-			connected.push_back(get_local_tile(tile))
-			visited[tile] = true
+			connected.push_back(tile)
+			visited[tile.hash()] = true
 			queue.push_back(tile)
 
 	return connected
 
 func create_route_for_person(starting_pos: RealTile) -> Array[RealTile]:
 	var end_pos: RealTile = get_tiles_connected_by_road(starting_pos).pick_random()
+	if end_pos == null:
+		return []
 	var route: Array[RealTile] = bfs(starting_pos, end_pos, is_road)
 	
 	return route
