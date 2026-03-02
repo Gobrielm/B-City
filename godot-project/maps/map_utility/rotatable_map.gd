@@ -1,7 +1,6 @@
 class_name RotatableMap extends Node2D
 
 var current_rotation: int = 0
-const LAYERS: int = 10
 const map_size: Vector2i = Vector2i(128, 128)
 
 var grid: Dictionary[Vector2i, TileInfo] = {}
@@ -19,8 +18,11 @@ func _ready() -> void:
 # --- Cell Utility Functions ---
 
 func set_cell(actual_tile: RealTile, tile_info: TileInfo) -> void:
-	grid[actual_tile.hash()] = tile_info
 	var local_tile: LocalTile = get_local_tile(actual_tile)
+	if grid.has(actual_tile.hash()):
+		var old_height: int = grid[actual_tile.hash()].height
+		layers[old_height].erase_cell(local_tile.tile)
+	grid[actual_tile.hash()] = tile_info
 	layers[tile_info.height].set_cell(local_tile.tile, 0, tile_info.atlas)
 
 func get_cell(actual_tile: RealTile) -> TileInfo:
@@ -28,7 +30,7 @@ func get_cell(actual_tile: RealTile) -> TileInfo:
 	return grid[actual_tile.hash()]
 
 func replace_cell(actual_tile: RealTile, atlas: Vector2i) -> void:
-	assert(grid.has(actual_tile))
+	assert(grid.has(actual_tile.hash()))
 	var height: int = grid[actual_tile.hash()].height
 	grid[actual_tile.hash()].atlas = atlas
 	var local_tile: LocalTile = get_local_tile(actual_tile)
@@ -50,9 +52,10 @@ func get_used_cells() -> Array[RealTile]:
 
 func get_used_cells_by_id(atlas: Vector2i) -> Array[RealTile]:
 	var toReturn: Array[RealTile] = []
-	for layer: TileMapLayer in layers:
-		for cell: Vector2i in layer.get_used_cells_by_id(0, atlas):
-			toReturn.push_back(get_real_tile(LocalTile.new(cell)))
+	for tile: Vector2i in grid:
+		var tile_info: TileInfo = grid[tile]
+		if tile_info.atlas == atlas:
+			toReturn.push_back(RealTile.new(tile))
 	return toReturn
 
 func get_used_cells_by_multiple_ids(atlases: Array[Vector2i]) -> Array[RealTile]:
@@ -65,6 +68,25 @@ func get_used_cells_by_multiple_ids(atlases: Array[Vector2i]) -> Array[RealTile]
 
 func get_surrounding_cells(tile: Vector2i) -> Array[Vector2i]:
 	return layers[0].get_surrounding_cells(tile)
+
+func get_corner_tiles(tile: Vector2i) -> Array[Vector2i]:
+	return [tile + Vector2i(1, 1), tile + Vector2i(-1, 1), tile + Vector2i(1, -1), tile + Vector2i(-1, -1)]
+
+func get_closest_tile_between_two(tile1: RealTile, tile2: RealTile, local_pos: Vector2) -> RealTile:
+	var tile1_info: TileInfo = TerrainMap.get_instance().get_cell(tile1)
+	var tile2_info: TileInfo = TerrainMap.get_instance().get_cell(tile2)
+	
+	if (tile1_info == null or tile2_info == null): return null
+	var height1: int = tile1_info.height
+	var height2: int = tile2_info.height
+	
+	var local1: Vector2 = layers[height1].map_to_local(tile1.tile) + Vector2(0, 16 * height1)
+	var local2: Vector2 = layers[height2].map_to_local(tile2.tile) + Vector2(0, 16 * height2)
+	
+	if (local1.distance_to(local_pos) > local2.distance_to(local_pos)):
+		return tile2
+	else:
+		return tile1
 
 # --- Pathfinding ---
 func bfs(start: RealTile, destination: RealTile, is_traversable: Callable = func (_tile: RealTile) -> bool: return true) -> Array[RealTile]:
@@ -80,7 +102,7 @@ func bfs(start: RealTile, destination: RealTile, is_traversable: Callable = func
 		if current.hash() == destination.hash():
 			found = true
 			break
-		for real: Vector2i in layers[0].get_surrounding_cells(current.tile):
+		for real: Vector2i in get_surrounding_cells(current.tile):
 			var real_tile: RealTile = RealTile.new(real)
 			if (!visited.has(real_tile.hash()) and is_traversable.call(real_tile)):
 				queue.push_back(real_tile)
@@ -91,6 +113,35 @@ func bfs(start: RealTile, destination: RealTile, is_traversable: Callable = func
 	else:
 		return []
 
+func bfs_to_goal(start: RealTile, 
+	is_traversable: Callable = func (_tile: RealTile) -> bool: return true, 
+	is_goal: Callable = func(_tile: RealTile) -> bool: return true
+) -> Array[RealTile]:
+	var current: RealTile
+	var destination: RealTile = null
+	var queue: Array[RealTile] = [start]
+	var tile_to_prev: Dictionary[Vector2i, RealTile] = {}
+	var visited: Dictionary[Vector2i, int] = {}
+	visited[start.hash()] = 0
+	
+	while !queue.is_empty():
+		current = queue.pop_front()
+		for real: Vector2i in get_surrounding_cells(current.tile):
+			var real_tile: RealTile = RealTile.new(real)
+			if (!visited.has(real_tile.hash()) and is_traversable.call(real_tile)):
+				queue.push_back(real_tile)
+				visited[real_tile.hash()] = 0
+				tile_to_prev[real_tile.hash()] = current
+			elif is_goal.call(real_tile):
+				destination = real_tile
+				tile_to_prev[real_tile.hash()] = current
+				break
+		if destination:
+			break
+	if destination:
+		return create_route_from_tile_to_prev(start, destination, tile_to_prev)
+	else:
+		return []
 
 func create_route_from_tile_to_prev(start: RealTile, destination: RealTile, tile_to_prev: Dictionary[Vector2i, RealTile]) -> Array[RealTile]:
 	var current: RealTile = destination
@@ -105,7 +156,7 @@ func create_route_from_tile_to_prev(start: RealTile, destination: RealTile, tile
 func get_cell_from_local(local_pos: Vector2) -> RealTile:
 	var helper: Callable = func (local_position: Vector2, height: int) -> RealTile:
 		var layer: TileMapLayer = layers[height]
-		for i: int in range(33):
+		for i: int in range(17):
 			var local_tile: LocalTile = LocalTile.new(layer.local_to_map(local_position - Vector2(0, i)))
 			var actual_tile: RealTile = get_real_tile(local_tile)
 			var tile_info: TileInfo = get_cell(actual_tile)
@@ -113,7 +164,7 @@ func get_cell_from_local(local_pos: Vector2) -> RealTile:
 		return null
 	
 	for height: int in range(layers.size() - 1, -1, -1):
-		var offset: Vector2 = Vector2(0, 32 * height)
+		var offset: Vector2 = Vector2(0, 16 * height)
 		
 		var actual_tile: RealTile = helper.call(local_pos + offset, height)
 		if (actual_tile == null): continue
@@ -127,14 +178,13 @@ func get_cell_from_local(local_pos: Vector2) -> RealTile:
 func get_local_from_cell(actual_tile: RealTile) -> Vector2:
 	var tile_info: TileInfo = get_cell(actual_tile)
 	var local_tile: LocalTile = get_local_tile(actual_tile)
-	var y_offset: int = 16 if tile_info.is_half_tile() else 0
 	if (tile_info != null):
-		return layers[tile_info.height].map_to_local(local_tile.tile) - Vector2(0, 32 * tile_info.height) + Vector2(0, y_offset)
+		return layers[tile_info.height].map_to_local(local_tile.tile) - Vector2(0, 16 * tile_info.height)
 	else:
 		return layers[0].map_to_local(local_tile.tile)
  
 func rotate_map(rotate_left: bool) -> void:
-	for height: int in LAYERS:
+	for height: int in layers.size():
 		rotate_layer(height, rotate_left)
 	
 	current_rotation = get_next_rotation(rotate_left)

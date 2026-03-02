@@ -8,18 +8,25 @@ script = ExtResource("1_vrnrs")
 [node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=2088751896]
 
 [node name="MosueCoordsLabel" type="Label" parent="CanvasLayer" unique_id=416693205]
-offset_left = 388.0
-offset_top = 268.0
-offset_right = 507.0
-offset_bottom = 291.0
+offset_left = 390.0
+offset_top = 232.0
+offset_right = 509.0
+offset_bottom = 255.0
 text = "Mouse Coords: "
 
 [node name="CameraCoordsLabel" type="Label" parent="CanvasLayer" unique_id=1329911752]
-offset_left = 385.0
-offset_top = 221.0
-offset_right = 504.0
-offset_bottom = 244.0
+offset_left = 389.0
+offset_top = 194.0
+offset_right = 517.0
+offset_bottom = 217.0
 text = "Camera Coords: "
+
+[node name="MouseHeightLabel" type="Label" parent="CanvasLayer" unique_id=540263588]
+offset_left = 389.0
+offset_top = 277.0
+offset_right = 429.0
+offset_bottom = 300.0
+text = "Mouse Height: "
 
 [node name="ColorRect" type="ColorRect" parent="CanvasLayer" unique_id=9021827]
 offset_left = -2.0

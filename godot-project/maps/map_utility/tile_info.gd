@@ -11,4 +11,4 @@ func is_half_tile() -> bool:
 	return atlas.x % 2 == 1
 
 func is_water() -> bool:
-	return atlas == Vector2i(5, 0) or atlas == Vector2i(4, 0)
+	return atlas == Vector2i(2, 0)

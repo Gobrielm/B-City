@@ -54,5 +54,8 @@ func set_screen_with_center_position(pos: Vector2) -> void:
 func set_mouse_coords_label(tile: Vector2i) -> void:
 	$CanvasLayer/MosueCoordsLabel.text = "Mouse Coords: " + str(tile)
 
+func set_mouse_height_label(height: int) -> void:
+	$CanvasLayer/MouseHeightLabel.text = "Mouse Height: " + str(height)
+
 func set_camera_coords_label(tile: Vector2i) -> void:
 	$CanvasLayer/CameraCoordsLabel.text = "Camera Coords: " + str(tile)

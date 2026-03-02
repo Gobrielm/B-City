@@ -7,6 +7,8 @@ static func get_instance() -> TerrainMap:
 	return singleton_instance
 
 static var e: float = 2.71828 
+const LAYERS: int = 10
+
 var noise_seed: int = 100
 var noise: FastNoiseLite = FastNoiseLite.new()
 var thread: Thread
@@ -19,10 +21,15 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT and event.is_released():
 			replace_cell(tile_on_mouse, Vector2i(2, 0))
-	elif event.is_action("debug"):
-		visible = !visible
+	elif event.is_action_released("debug"):
+		visible = true
+	elif event.is_action_pressed("debug"):
+		visible = false
 	
 	player_camera.set_mouse_coords_label(tile_on_mouse.tile)
+	var tile_info: TileInfo = get_cell(tile_on_mouse)
+	if (tile_info != null):
+		player_camera.set_mouse_height_label(tile_info.height)
 	
 	var local_camera_pos: Vector2 = player_camera.get_screen_center_position()
 	var tile_on_camera: RealTile = get_cell_from_local(local_camera_pos)
@@ -37,18 +44,14 @@ func _ready() -> void:
 		layer.tile_set = tileset
 		layer.z_index = 0
 		layers.append(layer)
-		layer.position = Vector2i(0, -32 * i)
-		layer.y_sort_origin = 32 * i
+		layer.position = Vector2i(0, -16 * i)
+		layer.y_sort_origin = 16 * i
 		layer.y_sort_enabled = true
 		#layer.modulate = Color((float(i) / LAYERS) + 0.15, (float(i) / LAYERS) + 0.15, (float(i) / LAYERS + 0.15), 1)
 		add_child(layer)
 	
 	generate_map()
-	#set_cell(Vector2i(0, 0), Vector2i(0, 0), 0)
-	#set_cell(Vector2i(0, -1), Vector2i(0, 0), 1)
-	#set_cell(Vector2i(-1, -1), Vector2i(0, 0), 1)
-	#set_cell(Vector2i(0, -2), Vector2i(0, 0), 2)
-	#set_cell(Vector2i(0, -3), Vector2i(0, 0), 3)
+	#generate_test_map()
 	assert(singleton_instance == null, "Terrain Map has been instanced twice.")
 	singleton_instance = self
 	
@@ -57,8 +60,8 @@ func _ready() -> void:
 
 func create_cities() -> void:
 	while(CityMap.singleton_instance == null):
-		OS.delay_msec(10)
-	CityMap.get_instance().generate_cities()
+		OS.delay_msec(100)
+	CityMap.get_instance().call_thread_safe("generate_cities")
 
 func create_tile_set() -> TileSet:
 	var tileset: TileSet = TileSet.new()
@@ -68,21 +71,28 @@ func create_tile_set() -> TileSet:
 	
 	var source: TileSetAtlasSource = TileSetAtlasSource.new()
 	source.texture = load("res://assets/isometric.png")
-	source.texture_region_size = Vector2i(64, 96)
+	source.margins = Vector2i(0, 16)
+	source.texture_region_size = Vector2i(64, 64)
 	
 	source.create_tile(Vector2i(0, 0))
 	source.create_tile(Vector2i(1, 0))
 	source.create_tile(Vector2i(2, 0))
-	source.create_tile(Vector2i(3, 0))
-	source.create_tile(Vector2i(4, 0))
-	source.create_tile(Vector2i(5, 0))
 	tileset.add_source(source)
 	return tileset
+
+func generate_test_map() -> void:
+	@warning_ignore("integer_division")
+	for x: int in range(-map_size.x / 2, map_size.x / 2):
+		@warning_ignore("integer_division")
+		for y: int in range(-map_size.y / 2, map_size.y / 2):
+			
+			place_terrain(x, y, 5.0, 0)
 
 func generate_map() -> void:
 	# Higher value, bigger mountains
 	const MOUNTAINNESS: float = 1.5
 	# 1. Initialize Noise
+	seed(noise_seed)
 	noise.seed = noise_seed if noise_seed != 0 else randi()
 	noise.noise_type = FastNoiseLite.TYPE_PERLIN
 	noise.frequency = 0.05
@@ -107,19 +117,15 @@ func place_terrain(x: int, y: int, h_val: float, f_val: float) -> void:
 	
 	var height: float = (h_val) * 2.0
 	var forested: bool = f_val > 1.0
-	var x_offset: int = 2 if forested else 0
+	var x_offset: int = 1 if forested else 0
 	
 	var real_tile: RealTile = RealTile.new(Vector2i(x, y))
 	
 	if (height <= 1):
-		
-		set_cell(real_tile, TileInfo.new(Vector2i(4, 0), 0))
+		set_cell(real_tile, TileInfo.new(Vector2i(2, 0), 0))
 		return
 	
-	if (round(height) > floor(height)):
-		set_cell(real_tile, TileInfo.new(Vector2i(0 + x_offset, 0), min(floor(height), LAYERS - 1) as int))
-	else:
-		set_cell(real_tile,  TileInfo.new(Vector2i(1 + x_offset, 0), min(floor(height), LAYERS - 1) as int))
+	set_cell(real_tile, TileInfo.new(Vector2i(0 + x_offset, 0), min(floor(height), LAYERS - 1) as int))
 
 #func generate_rivers() -> void:
 	#var path: Array[RealTile] = a_star(Vector2i(4, -10), Vector2i(30, 40))
